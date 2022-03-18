@@ -17,3 +17,5 @@ case class WordCount(word: String, count: Int)
 case class CalcAndSaveResult(status: CalcStatus, processedDocs: Int, errorMessage: Option[String])
 
 case class Dict(id_dim: Int, word: String)
+
+case class DictWCDoc(id_dim: Int, cnt: Long)
