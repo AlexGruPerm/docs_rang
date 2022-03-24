@@ -1,16 +1,11 @@
 package domain
 
-import common.{CalcAndSaveResult, Dict, DictWCDoc, Ok, WordCount}
+import common.{CalcAndSaveResult, DbSchema, Dict, DictWCDoc, Ok, WordCount}
 import data.DocsSourceData
 import data.DocsSourceData.{getDatasetDict, getListOfUncalDocs}
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 object DocsWordCounter {
-
-  private val prop = new java.util.Properties
-  prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
-  prop.setProperty("user", "MSK_ARM_LEAD")
-  prop.setProperty("password", "MSK_ARM_LEAD")
 
   /**
    * Read the list of Dictionary words (dict_dimension).
@@ -18,19 +13,24 @@ object DocsWordCounter {
    * Read Documents from db one by one and calculate count of dictionary words.
    * Save all results back in to db - doc_dim_count.
   */
-  def calcAndSaveWcUncalcDocs(spark: SparkSession, url_string: String): CalcAndSaveResult = {
+  def calcAndSaveWcUncalcDocs(spark: SparkSession, url_string: String, schema: DbSchema): CalcAndSaveResult = {
     import spark.implicits._
 
-    val dictDataSet: Dataset[Dict] = getDatasetDict(spark, url_string)
+    val prop = new java.util.Properties
+    prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
+    prop.setProperty("user", schema.login)
+    prop.setProperty("password", schema.password)
+
+    val dictDataSet: Dataset[Dict] = getDatasetDict(spark, url_string, schema)
     dictDataSet.take(30).foreach(r => println(s"dictDataSet row = ${r.id_dim} - ${r.word}"))
     dictDataSet.createOrReplaceTempView("dict")
 
-    val listOfUncalcDocs: List[Int] = getListOfUncalDocs(spark, url_string)
+    val listOfUncalcDocs: List[Int] = getListOfUncalDocs(spark, url_string, schema)
 
     listOfUncalcDocs.foreach{docId =>
       //читаем документ для рассчета.
       println(s"Current document ID = $docId =========================================================")
-      val countsDataSet: Dataset[WordCount] = DocsSourceData.getWordCountByDocId(spark,url_string,docId)
+      val countsDataSet: Dataset[WordCount] = DocsSourceData.getWordCountByDocId(spark,url_string,docId, schema)
       countsDataSet.sort($"count".desc).take(50).foreach(r => println(s"countsDataSet row = ${r.word} - ${r.count}"))
       countsDataSet.createOrReplaceTempView("counts")
 
